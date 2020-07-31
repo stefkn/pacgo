@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 	"time"
+
+	"github.com/danicat/simpleansi"
 )
 
 var (
@@ -91,50 +93,49 @@ var maze []string
 var numDots int
 
 func printScreen() {
-	clearScreen()
+	simpleansi.ClearScreen()
 	for _, line := range maze {
 		for _, chr := range line {
 			switch chr {
 			case '#':
-				fmt.Printf(cfg.Wall)
+				fmt.Print(simpleansi.WithBlueBackground(cfg.Wall))
 			case '.':
-				fmt.Printf(cfg.Dot)
+				fmt.Print(cfg.Dot)
+			case 'X':
+				fmt.Print(cfg.Pill)
 			default:
-				fmt.Printf(cfg.Space)
+				fmt.Print(cfg.Space)
 			}
 		}
-		fmt.Printf("\n")
+		fmt.Println()
 	}
 
 	for _, s := range sprites {
 		moveCursor(s.Pos())
-		fmt.Printf(s.Img())
+		fmt.Print(s.Img())
 	}
 
 	moveCursor(len(maze)+1, 0)
-	fmt.Printf("Score: %v\tLives: %v\n", player.score, player.lives)
-
-	moveCursor(len(maze)+3, 0)
-	fmt.Printf("%v", chaserPath)
+	fmt.Println("Score:", player.score, "\tLives:", player.lives)
 }
 
 func main() {
 	flag.Parse()
 
-	// initialize game
-	initialize()
+	// initialise game
+	initialise()
 	defer cleanup()
 
 	// load resources
 	err := loadConfig()
 	if err != nil {
-		log.Printf("Error loading configuration: %v\n", err)
+		log.Println("Error loading configuration:", err)
 		return
 	}
 
 	err = loadMaze()
 	if err != nil {
-		log.Printf("Error loading maze: %v\n", err)
+		log.Println("Error loading maze:", err)
 		return
 	}
 
@@ -149,10 +150,10 @@ func main() {
 		printScreen()
 
 		// check game over
-		if numDots == 0 || player.lives == 0 {
-			if player.lives == 0 {
+		if numDots == 0 || player.lives <= 0 {
+			if player.lives <= 0 {
 				moveCursor(player.Pos())
-				fmt.Printf(cfg.Death)
+				fmt.Print(cfg.Death)
 				moveCursor(len(maze)+2, 0)
 			}
 			break

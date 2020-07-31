@@ -31,29 +31,15 @@ Please note that this value is only filled after calling `flag.Parse`, which sho
 func main() {
     flag.Parse()
 
-    // initialize game
-    initialize()
+    // initialise game
+    initialise()
     defer cleanup()
 
     // rest of the function omitted...
 }
 ```
 
-Please note that we are calling `flag.Parse()` as the very first thing in the program. We've also renamed the `init()` function to `initialize()`:
-
-```go
-func initialize() {
-    cbTerm := exec.Command("/bin/stty", "cbreak", "-echo")
-    cbTerm.Stdin = os.Stdin
-
-    err := cbTerm.Run()
-    if err != nil {
-        log.Fatalf("Unable to activate cbreak mode terminal: %v\n", err)
-    }
-}
-```
-
-It is still the same function, but without the special treatment the `init` function has, which is to be called before `main`. We want to do that because we want the flags to be parsed **before** changing the console to `cbreak` mode.
+Please note that we are calling `flag.Parse()` as the very first thing in the program. We want to do that because we want the flags to be parsed **before** changing the console to `cbreak` mode.
 
 When the flag is parsed in case of error it calls `os.Exit`, which means our `cleanup` function wouldn't be called leaving the terminal without echo and still in cbreak mode, which can be quite inconvenient.
 
@@ -61,41 +47,32 @@ With this change, by controlling the order things are called, we are making sure
 
 ## Task 02: Replacing the hard coded files with the flags
 
-We've already handled the parsing, now we need to replace the hard coded values with their flag equivalents. 
+We've already handled the parsing, now we need to replace the hard coded values with their flag equivalents.
 
-This is done replacing the hard coded value by the value of the flag (please note the de-reference operator, as the flags are pointers).
+This is done by replacing the hard coded value with the value of the flag (please note the de-reference operator, as the flags are pointers).
 
-At `loadConfig`:
-
-```go
-func loadConfig() error {
-    f, err := os.Open(*configFile)
-    if err != nil {
-        return err
-    }
-    defer f.Close()
-
-    // rest of the function omitted...
-}
-```
-
-And `loadMaze`:
+In `main`:
 
 ```go
-func loadMaze() error {
-    f, err := os.Open(*mazeFile)
+    // load resources
+    err := loadMaze(*mazeFile)
     if err != nil {
-        return err
+        log.Println("failed to load maze:", err)
+        return
     }
-    defer f.Close()
-    // rest of the function omitted...
+
+    err = loadConfig(*configFile)
+    if err != nil {
+        log.Println("failed to load configuration:", err)
+        return
+    }
 ```
 
 Now try running in the command line:
 
 ```sh
-$ go build
-$ ./step08 --help
+go build
+./step08 --help
 ```
 
 You should see something like:
@@ -113,4 +90,6 @@ Now try running `step08` with `--config-file config_noemoji.json` first, and `--
 
 You can also try copying `maze01.txt` to a new file and editing it to experiment.
 
-Maybe you can create your own themes now... try visiting https://unicode.org/emoji/charts/full-emoji-list.html for inspiration. :)
+Maybe you can create your own themes now... try visiting [Full Emoji List](https://unicode.org/emoji/charts/full-emoji-list.html) for inspiration. :)
+
+[Take me to step 09!](../step09/README.md)

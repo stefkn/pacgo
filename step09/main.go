@@ -2,20 +2,30 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/danicat/simpleansi"
 )
 
+var (
+	configFile = flag.String("config-file", "config.json", "path to custom configuration file")
+	mazeFile   = flag.String("maze-file", "maze01.txt", "path to a custom maze file")
+)
+
 type sprite struct {
-	row int
-	col int
+	row      int
+	col      int
+	startRow int
+	startCol int
 }
 
 type config struct {
@@ -35,7 +45,7 @@ var ghosts []*sprite
 var maze []string
 var score int
 var numDots int
-var lives = 1
+var lives = 3
 
 func loadConfig(file string) error {
 	f, err := os.Open(file)
@@ -70,9 +80,9 @@ func loadMaze(file string) error {
 		for col, char := range line {
 			switch char {
 			case 'P':
-				player = sprite{row, col}
+				player = sprite{row, col, row, col}
 			case 'G':
-				ghosts = append(ghosts, &sprite{row, col})
+				ghosts = append(ghosts, &sprite{row, col, row, col})
 			case '.':
 				numDots++
 			}
@@ -117,7 +127,22 @@ func printScreen() {
 	}
 
 	moveCursor(len(maze)+1, 0)
-	fmt.Println("Score:", score, "\tLives:", lives)
+
+	livesRemaining := strconv.Itoa(lives) //converts lives int to a string
+	if cfg.UseEmoji {
+		livesRemaining = getLivesAsEmoji()
+	}
+
+	fmt.Println("Score:", score, "\tLives:", livesRemaining)
+}
+
+//concatenate the correct number of player emojis based on lives
+func getLivesAsEmoji() string {
+	buf := bytes.Buffer{}
+	for i := lives; i > 0; i-- {
+		buf.WriteString(cfg.Player)
+	}
+	return buf.String()
 }
 
 func readInput() (string, error) {
@@ -159,7 +184,7 @@ func makeMove(oldRow, oldCol int, dir string) (newRow, newCol int) {
 		}
 	case "DOWN":
 		newRow = newRow + 1
-		if newRow == len(maze) {
+		if newRow == len(maze)-1 {
 			newRow = 0
 		}
 	case "RIGHT":
@@ -239,18 +264,20 @@ func cleanup() {
 }
 
 func main() {
-	// initialise game
+	flag.Parse()
+
+	// initialize game
 	initialise()
 	defer cleanup()
 
 	// load resources
-	err := loadMaze("maze01.txt")
+	err := loadMaze(*mazeFile)
 	if err != nil {
 		log.Println("failed to load maze:", err)
 		return
 	}
 
-	err = loadConfig("config.json")
+	err = loadConfig(*configFile)
 	if err != nil {
 		log.Println("failed to load configuration:", err)
 		return
@@ -262,7 +289,7 @@ func main() {
 		for {
 			input, err := readInput()
 			if err != nil {
-				log.Println("error reading input:", err)
+				log.Print("error reading input:", err)
 				ch <- "ESC"
 			}
 			ch <- input
@@ -285,8 +312,15 @@ func main() {
 
 		// process collisions
 		for _, g := range ghosts {
-			if player == *g {
-				lives--
+			if player.row == g.row && player.col == g.col {
+				lives = lives - 1
+				if lives != 0 {
+					moveCursor(player.row, player.col)
+					fmt.Print(cfg.Death)
+					moveCursor(len(maze)+2, 0)
+					time.Sleep(1000 * time.Millisecond) //dramatic pause before resetting player position
+					player.row, player.col = player.startRow, player.startCol
+				}
 			}
 		}
 
@@ -298,6 +332,8 @@ func main() {
 			if lives == 0 {
 				moveCursor(player.row, player.col)
 				fmt.Print(cfg.Death)
+				moveCursor(player.startRow, player.startCol-1)
+				fmt.Print("GAME OVER")
 				moveCursor(len(maze)+2, 0)
 			}
 			break

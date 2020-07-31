@@ -6,18 +6,20 @@ import (
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/danicat/simpleansi"
 )
 
-// Player is the player character \o/
-type Player struct {
+type sprite struct {
 	row int
 	col int
 }
 
-var player Player
+var player sprite
+var maze []string
 
-func loadMaze() error {
-	f, err := os.Open("maze01.txt")
+func loadMaze(file string) error {
+	f, err := os.Open(file)
 	if err != nil {
 		return err
 	}
@@ -33,7 +35,7 @@ func loadMaze() error {
 		for col, char := range line {
 			switch char {
 			case 'P':
-				player = Player{row, col}
+				player = sprite{row, col}
 			}
 		}
 	}
@@ -41,36 +43,25 @@ func loadMaze() error {
 	return nil
 }
 
-var maze []string
-
-func clearScreen() {
-	fmt.Printf("\x1b[2J")
-	moveCursor(0, 0)
-}
-
-func moveCursor(row, col int) {
-	fmt.Printf("\x1b[%d;%df", row+1, col+1)
-}
-
 func printScreen() {
-	clearScreen()
+	simpleansi.ClearScreen()
 	for _, line := range maze {
 		for _, chr := range line {
 			switch chr {
 			case '#':
 				fmt.Printf("%c", chr)
 			default:
-				fmt.Printf(" ")
+				fmt.Print(" ")
 			}
 		}
-		fmt.Printf("\n")
+		fmt.Println()
 	}
 
-	moveCursor(player.row, player.col)
-	fmt.Printf("P")
+	simpleansi.MoveCursor(player.row, player.col)
+	fmt.Print("P")
 
-	moveCursor(len(maze)+1, 0)
-	fmt.Printf("Row %v Col %v", player.row, player.col)
+	// Move cursor outside of maze drawing area
+	simpleansi.MoveCursor(len(maze)+1, 0)
 }
 
 func readInput() (string, error) {
@@ -112,7 +103,7 @@ func makeMove(oldRow, oldCol int, dir string) (newRow, newCol int) {
 		}
 	case "DOWN":
 		newRow = newRow + 1
-		if newRow == len(maze)-1 {
+		if newRow == len(maze) {
 			newRow = 0
 		}
 	case "RIGHT":
@@ -139,34 +130,35 @@ func movePlayer(dir string) {
 	player.row, player.col = makeMove(player.row, player.col, dir)
 }
 
-func init() {
-	cbTerm := exec.Command("/bin/stty", "cbreak", "-echo")
+func initialise() {
+	cbTerm := exec.Command("stty", "cbreak", "-echo")
 	cbTerm.Stdin = os.Stdin
 
 	err := cbTerm.Run()
 	if err != nil {
-		log.Fatalf("Unable to activate cbreak mode terminal: %v\n", err)
+		log.Fatalln("unable to activate cbreak mode:", err)
 	}
 }
 
 func cleanup() {
-	cookedTerm := exec.Command("/bin/stty", "-cbreak", "echo")
+	cookedTerm := exec.Command("stty", "-cbreak", "echo")
 	cookedTerm.Stdin = os.Stdin
 
 	err := cookedTerm.Run()
 	if err != nil {
-		log.Fatalf("Unable to activate cooked mode terminal: %v\n", err)
+		log.Fatalln("unable to activate cooked mode:", err)
 	}
 }
 
 func main() {
-	// initialize game
+	// initialise game
+	initialise()
 	defer cleanup()
 
 	// load resources
-	err := loadMaze()
+	err := loadMaze("maze01.txt")
 	if err != nil {
-		log.Printf("Error loading maze: %v\n", err)
+		log.Println("failed to load maze:", err)
 		return
 	}
 
@@ -178,7 +170,7 @@ func main() {
 		// process input
 		input, err := readInput()
 		if err != nil {
-			log.Printf("Error reading input: %v", err)
+			log.Println("error reading input:", err)
 			break
 		}
 
